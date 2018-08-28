@@ -40,13 +40,13 @@ class App extends Component {
     ctx.fillStyle = 'black'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    /* this.sound = new Howl({
+    this.sound = new Howl({
       src: [spaceSounds],
       autoplay: true,
       loop: true,
       volume: 0.5,
-    });      */
-    //this.sound.play();
+    });     
+    this.sound.play();
 
     const rocketShip = new Image()
     rocketShip.src = rocketShipImage
