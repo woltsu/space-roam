@@ -1,5 +1,6 @@
 import React, { Component } from 'react'
 import { Howl, Howler } from 'howler';
+import shuffle from 'shuffle-array'
 import * as spaceSounds from './assets/deep_space.mp3'
 import * as rocketShipImage from './assets/rocket-ship.png'
 import * as thrustImage from './assets/thrust.png'
@@ -17,7 +18,10 @@ class App extends Component {
       stars: [],
       rocket: null,
       ctx: null,
-      radius: 10
+      radius: 10,
+      bgColors: ['845EC2', '2C73D2', '0081CF', '0089BA', '008E9B', '008F7A'],
+      currentBgColors: ['845EC2', '2C73D2', '0081CF', '0089BA', '008E9B', '008F7A'],
+      bgCounter: 0,
     }
     this.fps = 60
   }
@@ -32,7 +36,6 @@ class App extends Component {
     canvas.width  = window.innerWidth
     canvas.height = window.innerHeight
     window.addEventListener('resize', (event) => {
-      console.log('dada')
       this.refs.canvas.width  = window.innerWidth
       this.refs.canvas.height = window.innerHeight
       this.initStars()
@@ -96,6 +99,16 @@ class App extends Component {
 
   generateDirection = () => Math.random() < 0.5 ? -1 : 1
 
+  getRandCol = () => `rgb(${Math.random() * 254}, ${Math.random() * 254}, ${Math.random() * 254})`
+
+  generateColors = () => {
+    const colors = []
+    for (let i = 0; i < Math.random() * 6; i++) {
+      colors.push(this.getRandCol())
+    }
+    return colors
+  }
+
   createAsteroid = () => {
     const { radius } = this.state
     const xDir = this.generateDirection()
@@ -110,7 +123,9 @@ class App extends Component {
       y: Math.random() * window.innerHeight,
       z: zDir < 0 ? 260 : -600,
       speed: { x: speedX, y: speedY, z: speedZ },
-      radius: r
+      radius: r,
+      colors: this.generateColors(),
+      colorYOffset: Math.random() * 4
     }
     this.setState((prevState) => ({ asteroids: prevState.asteroids.concat(newAsteroid) }))
   }
@@ -141,7 +156,8 @@ class App extends Component {
   }
 
   initAsteroids = () => {
-    for (let i = 0; i < 30; i++) {
+    const howManyAsteroids = 23
+    for (let i = 0; i < howManyAsteroids; i++) {
       this.createAsteroid(true)
     }
   }
@@ -157,18 +173,50 @@ class App extends Component {
   }
 
   refreshCanvas = () => {
-    const { ctx, stars } = this.state
+    const { ctx, stars, bgColors, bgCounter, currentBgColors } = this.state
     ctx.beginPath()
     ctx.clearRect(0, 0, this.refs.canvas.width, this.refs.canvas.height)
     ctx.closePath();
     ctx.beginPath()
     var grd=ctx.createLinearGradient(0, this.refs.canvas.height, this.refs.canvas.width, 0);
-    grd.addColorStop(0.17, '#845EC2');
-    grd.addColorStop(0.33, '#2C73D2');
-    grd.addColorStop(0.5, '#0081CF');    
-    grd.addColorStop(0.67, '#0089BA');
-    grd.addColorStop(0.83, '#008E9B');
-    grd.addColorStop(1, '#008F7A');
+
+    let temp = null
+    this.setState({ bgCounter: bgCounter + 1 })
+    for (let round = 0; round < 3; round++) {
+      if (bgCounter != 3) { break } 
+      this.setState({ bgCounter: 0 })
+      let completedAmount = 0
+      for (let i = 0; i < bgColors.length; i++) {
+        const nextIndex = i === bgColors.length - 1 ? 0 : i + 1
+        const nextValue = currentBgColors[nextIndex].substring(round * 2, round * 2 + 2)
+        const targetValue = bgColors[i].substring(round * 2, round * 2 + 2)
+        if (parseInt(nextValue, 16) < parseInt(targetValue, 16)) {
+          let newValue = (parseInt(nextValue, 16) + 1).toString(16)
+          if (newValue.length === 1) {
+            newValue = '0' + newValue
+          }
+          const result = currentBgColors[nextIndex].substring(0, round * 2) + newValue + currentBgColors[nextIndex].substring(round * 2 + 2, currentBgColors[nextIndex].length)
+          currentBgColors[nextIndex] = result
+        } else if (parseInt(nextValue, 16) > parseInt(targetValue, 16)) {
+          let newValue = (parseInt(nextValue, 16) - 1).toString(16)
+          if (newValue.length === 1) {
+            newValue = '0' + newValue
+          }
+          const result = currentBgColors[nextIndex].substring(0, round * 2) + newValue + currentBgColors[nextIndex].substring(round * 2 + 2, currentBgColors[nextIndex].length)
+          currentBgColors[nextIndex] = result
+        } else {
+          completedAmount = completedAmount + 1
+        }
+        if (completedAmount === currentBgColors.length) {
+          this.setState({ bgColors: currentBgColors.slice() })
+        }
+        this.setState({ currentBgColors })
+      }
+    }
+    currentBgColors.forEach((color, i) => {
+      grd.addColorStop(i / currentBgColors.length, `#${color}`)
+    })
+
     ctx.fillStyle=grd;
     ctx.fillRect(0, 0, this.refs.canvas.width, this.refs.canvas.height);
     ctx.closePath();
@@ -198,23 +246,39 @@ class App extends Component {
       const scaledRadius = radius * Math.pow(2, -asteroid.z / 100)
       // const dist = Math.sqrt(Math.pow(centerX - asteroid.x, 2) + Math.pow(centerY - asteroid.y, 2) + Math.pow(centerZ - asteroid.z, 2))
       const newAsteroid = {
+        ...asteroid,
         x: asteroid.x + asteroid.speed.x * (scaledRadius / 100),
         y: asteroid.y + asteroid.speed.y * (scaledRadius / 100),
         z: asteroid.z + asteroid.speed.z * (scaledRadius / 10),
-        speed: asteroid.speed,
-        radius
+        radius,
       }
       ctx.arc(asteroid.x - scaledRadius, asteroid.y - scaledRadius, scaledRadius, 0, 2 * Math.PI)
       ctx.lineWidth = 2
       ctx.stroke()
-      const grd2 = ctx.createRadialGradient(asteroid.x - scaledRadius / 2,asteroid.y - 1.3*scaledRadius,scaledRadius / 2,asteroid.x - scaledRadius / 2, asteroid.y-1.3*scaledRadius, 1.7*scaledRadius)
+      const colorYOffset = asteroid.colorYOffset
+      const grd2 = ctx.createRadialGradient(asteroid.x - scaledRadius / 2,asteroid.y - colorYOffset*1.3*scaledRadius,scaledRadius / 2,asteroid.x - scaledRadius / 2, asteroid.y-colorYOffset*1.3*scaledRadius, 1.7*scaledRadius)
       let shadowPercentage = Math.abs(asteroid.x / window.innerWidth)
       shadowPercentage = shadowPercentage > 1 ? 1 : shadowPercentage
-      grd2.addColorStop(0.4, 'grey')
-      grd2.addColorStop(1, 'lightgrey')     
+      asteroid.colors.forEach((color, i) => {
+        grd2.addColorStop(i/asteroid.colors.length, color)
+      })
       ctx.fillStyle=grd2;
       ctx.fill()
       ctx.closePath()
+      
+      //ctx.globalAlpha = 0.5;
+      ctx.beginPath()
+      ctx.arc(asteroid.x - scaledRadius, asteroid.y - scaledRadius, scaledRadius, 0, 2 * Math.PI)
+      ctx.lineWidth = 2
+      ctx.stroke()
+      const grd3 = ctx.createRadialGradient(asteroid.x - scaledRadius / 2,asteroid.y - 1.3*scaledRadius,scaledRadius / 2,asteroid.x - scaledRadius / 2, asteroid.y-1.3*scaledRadius, 1.7*scaledRadius)
+      //grd3.addColorStop(0.9, 'rgb(0,0,0,0)')
+      grd3.addColorStop(0.1, 'rgb(0,0,0,0)')
+      grd3.addColorStop(1, 'white')
+      ctx.fillStyle=grd3;
+      ctx.fill()
+      ctx.closePath()
+      //ctx.globalAlpha = 1;
       updatedAsteroids.push(newAsteroid)
     })
     this.setState({ asteroids: updatedAsteroids })
@@ -246,18 +310,20 @@ class App extends Component {
 
     if (Math.random() < 0.008 || newRocket.smoking) {
       // -90 is needed because the rocket points upwards at start
-      const changeX = Math.cos(Math.radians(newRocket.rotation - 90)) * 0.5
-      const changeY = Math.sin(Math.radians(newRocket.rotation - 90)) * 0.5
+      const changeX = Math.cos(Math.radians(newRocket.rotation - 90))
+      const changeY = Math.sin(Math.radians(newRocket.rotation - 90))
 
       if (!newRocket.smoking) {
         newRocket.speed.x = newRocket.speed.x + changeX
         newRocket.speed.y = newRocket.speed.y + changeY
       }
-      newRocket.smoking = true
+      if (!newRocket.smoking) {
       setTimeout(() => {
         this.setState((prevState) => ({ rocket: { ...prevState.rocket, smoking: false } }))
-      }, Math.random() * 2000)
+        }, Math.random() * 1000)
+      }
 
+      newRocket.smoking = true
       for (let i = 0; i < Math.random() * 5; i++) {
         const smokeX = newRocket.x - 20 * Math.cos(Math.radians(newRocket.rotation - 90))
         const smokeY = newRocket.y - 20 * Math.sin(Math.radians(newRocket.rotation - 90))
@@ -317,7 +383,11 @@ class App extends Component {
       ctx.fillStyle = particle.color
       ctx.beginPath()
       const lifetime = Date.now() - particle.timestamp
-      ctx.arc(particle.x, particle.y, particle.radius * (1-(lifetime/3000*particle.radius/7)), 0, 2 * Math.PI)
+      let sizeRatio = (1-(lifetime/3000*particle.radius/6))
+      if (sizeRatio < 0) {
+        sizeRatio = 0
+      }
+      ctx.arc(particle.x, particle.y, particle.radius * sizeRatio, 0, 2 * Math.PI)
       ctx.lineWidth = 3
       //ctx.stroke()
       ctx.fill()
