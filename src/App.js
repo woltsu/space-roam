@@ -1,4 +1,5 @@
 import React, { Component } from 'react'
+import Portfolio from './components/Portfolio'
 import { Howl, Howler } from 'howler';
 import shuffle from 'shuffle-array'
 import * as spaceSounds from './assets/deep_space.mp3'
@@ -317,7 +318,7 @@ class App extends Component {
       }
       ctx.arc(asteroid.x - scaledRadius, asteroid.y - scaledRadius, scaledRadius, 0, 2 * Math.PI)
       ctx.lineWidth = 2
-      ctx.stroke()
+      // ctx.stroke()
       const colorYOffset = asteroid.colorYOffset
       const grd2 = ctx.createRadialGradient(asteroid.x - scaledRadius / 2,asteroid.y - colorYOffset*1.3*scaledRadius,colorYOffset*(scaledRadius / 2),asteroid.x - scaledRadius / 2, asteroid.y-colorYOffset*1.3*scaledRadius, colorYOffset*(1.7*scaledRadius))
       let shadowPercentage = Math.abs(asteroid.x / window.innerWidth)
@@ -333,11 +334,23 @@ class App extends Component {
       ctx.beginPath()
       ctx.arc(asteroid.x - scaledRadius, asteroid.y - scaledRadius, scaledRadius, 0, 2 * Math.PI)
       ctx.lineWidth = 2
-      ctx.stroke()
+      //ctx.stroke()
       const grd3 = ctx.createRadialGradient(asteroid.x - scaledRadius / 2,asteroid.y - 1.3*scaledRadius,scaledRadius / 2,asteroid.x - scaledRadius / 2, asteroid.y-1.3*scaledRadius, 1.7*scaledRadius)
       grd3.addColorStop(0, 'rgb(0,0,0,0)')
       grd3.addColorStop(1, 'white')
       ctx.fillStyle=grd3;
+      ctx.fill()
+      ctx.closePath()
+
+      ctx.beginPath()
+      ctx.arc(asteroid.x - scaledRadius, asteroid.y - scaledRadius, scaledRadius, 0, 2 * Math.PI)
+      ctx.lineWidth = 2
+      //ctx.stroke()
+      const grd4 = ctx.createRadialGradient(asteroid.x - scaledRadius * 1.6,asteroid.y - scaledRadius * 0.6,scaledRadius / 4,asteroid.x - scaledRadius * 1.6, asteroid.y-scaledRadius * 0.6, 2*scaledRadius)
+      grd4.addColorStop(0, 'rgb(0,0,0,0)')      
+      grd4.addColorStop(1, 'black')
+
+      ctx.fillStyle=grd4
       ctx.fill()
       ctx.closePath()
       //ctx.globalAlpha = 1;
@@ -484,6 +497,9 @@ class App extends Component {
   render() {
     return (
       <div style={ styles.container }>
+        {/* <div style={ styles.portfolio }>
+          <Portfolio />
+        </div> */}
         <canvas ref='canvas' />
       </div>
     );
@@ -492,10 +508,17 @@ class App extends Component {
 
 const styles = {
   container: {
-    width: '100%',
-    height: '100%',
     position: 'absolute'
   },
+  portfolio: {
+    position: 'absolute',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    left: '20%',
+    right: '20%',
+    top: '5%',
+  }
 }
 
 export default App;
