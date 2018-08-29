@@ -19,7 +19,7 @@ class App extends Component {
       asteroidRadius: 10,
       fps: 60,
       rocketShipImage: null,
-      thrustImage: null
+      thrustImage: null,
     }
   }
 
@@ -74,8 +74,14 @@ class App extends Component {
     })
   }
 
-  updateState = () => {
+  updateState = (currentTimestamp) => {
     // Update all game objects
+    const { previousUpdateTimestamp } = gameState.getState()
+    const diff = currentTimestamp - previousUpdateTimestamp
+    if (diff < 16) {
+      return
+    }
+    gameState.setState({ previousUpdateTimestamp: currentTimestamp })
     this.draw()
     this.updateAsteroids()
     this.updateRocket()
