@@ -79,6 +79,7 @@ class App extends Component {
     const { previousUpdateTimestamp } = gameState.getState()
     const diff = currentTimestamp - previousUpdateTimestamp
     if (diff < 16) {
+      requestAnimationFrame(this.updateState)
       return
     }
     gameState.setState({ previousUpdateTimestamp: currentTimestamp })
