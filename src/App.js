@@ -1,14 +1,11 @@
 import React, { Component } from 'react'
 import Portfolio from './components/Portfolio'
+import utils from './utils'
 import { Howl, Howler } from 'howler';
 import shuffle from 'shuffle-array'
 import * as spaceSounds from './assets/deep_space.mp3'
 import * as rocketShipImage from './assets/rocket-ship.png'
 import * as thrustImage from './assets/thrust.png'
-
-Math.radians = function(degrees) {
-  return degrees * Math.PI / 180;
-}
 
 class App extends Component {
   constructor(props) {
@@ -29,9 +26,7 @@ class App extends Component {
   }
 
   componentDidMount = () => {
-    this.initAsteroids()
-    this.initStars()
-    this.initRocket()
+    this.initObjects()
     const canvas = this.refs.canvas
     const ctx = canvas.getContext('2d')
     this.setState({ ctx: canvas.getContext('2d') })
@@ -40,10 +35,8 @@ class App extends Component {
     window.addEventListener('resize', (event) => {
       this.refs.canvas.width  = window.innerWidth
       this.refs.canvas.height = window.innerHeight
-      this.initStars()
+      this.setState({ stars: utils.generateStars(window.innerWidth, window.innerHeight) })
     });
-    ctx.fillStyle = 'black'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     this.sound = new Howl({
       src: [spaceSounds],
@@ -66,8 +59,45 @@ class App extends Component {
     }, false);
   }
 
+  initObjects = () => {
+    this.setState({ asteroids: utils.generateAsteroids(20, this.state.radius) })
+    this.setState({ stars: utils.generateStars(window.innerWidth, window.innerHeight) })
+    this.setState({ rocket: utils.generateRocket() })
+  }
+
+  updateState = () => {
+    this.refreshBackground()
+    this.refreshAsteroids()
+    this.refreshRocket()
+    this.clearOutOfBoundsAsteroids()
+  }
+
+  refreshBackground = () => {
+    this.clearCanvas()
+    this.generateBackground()
+    this.drawStars()
+    this.generateFlyingStars()
+    this.drawFlyingStars()
+  }
+
+  start = () => {
+    
+  }
+
   componentWillUnmount = () => {
     this.sound.stop()
+  }
+
+  isOutOfBounds = (target) => {
+    if (target.x < 0 || target.x > window.innerWidth) {
+      return true
+    }
+
+    if (target.y < 0 || target.y > window.innerHeight) {
+      return true
+    }
+
+    return false
   }
 
   clearOutOfBoundsAsteroids = () => {
@@ -95,105 +125,21 @@ class App extends Component {
     }).sort((a, b) => (a.radius * Math.pow(2, -a.z / 100)) - (b.radius * Math.pow(2, -b.z / 100)))
     this.setState({ asteroids: updatedAsteroids })
     for (let i = 0; i < originalLength - updatedAsteroids.length; i++) {
-      this.createAsteroid()
+      this.setState((prevState) => ({ asteroids: prevState.asteroids.concat(utils.createAsteroid()) }))
     }
   }
 
-  isOutOfBounds = (target) => {
-    if (target.x < 0 || target.x > window.innerWidth) {
-      return true
-    }
-
-    if (target.y < 0 || target.y > window.innerHeight) {
-      return true
-    }
-
-    return false
-  }
-
-  generateDirection = () => Math.random() < 0.5 ? -1 : 1
-
-  getRandCol = () => `rgb(${Math.random() * 254}, ${Math.random() * 254}, ${Math.random() * 254})`
-
-  generateColors = () => {
-    const colors = []
-    for (let i = 0; i < Math.random() * 6; i++) {
-      colors.push(this.getRandCol())
-    }
-    return colors
-  }
-
-  createAsteroid = () => {
-    const { radius } = this.state
-    const xDir = this.generateDirection()
-    const yDir = this.generateDirection()
-    const zDir = this.generateDirection()
-    const speedX = Math.random() * xDir * 0.75
-    const speedY = Math.random() * yDir * 0.75
-    const speedZ = Math.random() * zDir * 0.25
-    const r = Math.random() * 30
-    const newAsteroid = {
-      x: Math.random() * window.innerWidth,
-      y: Math.random() * window.innerHeight,
-      z: zDir < 0 ? 260 : -600,
-      speed: { x: speedX, y: speedY, z: speedZ },
-      radius: r,
-      colors: this.generateColors(),
-      colorYOffset: Math.random() * 4
-    }
-    this.setState((prevState) => ({ asteroids: prevState.asteroids.concat(newAsteroid) }))
-  }
-
-  initRocket = () => {
-    const xDir = this.generateDirection()
-    const yDir = this.generateDirection()
-    const zDir = this.generateDirection()
-    const rotationDir = this.generateDirection()
-    const speedX = Math.random() * xDir * 0.75
-    const speedY = Math.random() * yDir * 0.75
-    const speedZ = Math.random() * zDir * 0.05
-    const rotationSpeed = Math.random() * rotationDir * 5
-    const rocket = {
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-      z: 200,
-      speed: { x: speedX, y: speedY, z: speedZ, rotation: rotationSpeed },
-      rotation: 0,
-      smoke: [],
-      thrust: 0,
-      smoking: false
-    }
-    if (this.state.rocket) {
-      rocket.smoke = this.state.rocket.smoke
-    }
-    this.setState({ rocket })
-  }
-
-  initAsteroids = () => {
-    const howManyAsteroids = 20
-    for (let i = 0; i < howManyAsteroids; i++) {
-      this.createAsteroid(true)
-    }
-  }
-
-  initStars = () => {
-    const stars = []
-    for (let i = 0; i < 80; i++) {
-      const x = Math.random() * window.innerWidth
-      const y = Math.random() * window.innerHeight
-      stars.push({ x, y })
-    }
-    this.setState({ stars })
-  }
-
-  refreshCanvas = () => {
-    const { ctx, stars, bgColors, bgCounter, currentBgColors, flyingStars } = this.state
+  clearCanvas = () => {
+    const { ctx } = this.state
     ctx.beginPath()
     ctx.clearRect(0, 0, this.refs.canvas.width, this.refs.canvas.height)
     ctx.closePath();
+  }
+
+  generateBackground = () => {
+    const { ctx, bgColors, bgCounter, currentBgColors } = this.state
     ctx.beginPath()
     var grd=ctx.createLinearGradient(0, this.refs.canvas.height, this.refs.canvas.width, 0);
-
     let temp = null
     this.setState({ bgCounter: bgCounter + 1 })
     for (let round = 0; round < 3; round++) {
@@ -227,14 +173,30 @@ class App extends Component {
         this.setState({ currentBgColors })
       }
     }
+
     currentBgColors.forEach((color, i) => {
-      grd.addColorStop(i / currentBgColors.length, `#${color}`)
+      grd.addColorStop(i / currentBgColors.length, `#${color.toUpperCase()}`)
     })
 
     ctx.fillStyle=grd;
     ctx.fillRect(0, 0, this.refs.canvas.width, this.refs.canvas.height);
     ctx.closePath();
+  }
 
+  generateFlyingStars = () => {
+    const { flyingStars } = this.state
+    if (Math.random() < 0.0025 && flyingStars.length < 3) {
+      const startX = Math.random() * window.innerWidth
+      const startY = Math.random() * window.innerHeight
+      const lifespan = Math.random() * 50 + 100
+      const xDir = utils.generateDirection() * Math.random() * 2
+      const yDir = utils.generateDirection() * Math.random() * 2
+      this.setState({ flyingStars: flyingStars.concat({start: { x: startX, y: startY }, current: { x: startX, y: startY }, lifespan, age: 0, xDir, yDir, isDead: false }) })
+    }
+  }
+
+  drawStars = () => {
+    const { ctx, stars } = this.state
     ctx.strokeStyle = 'white'
     ctx.fillStyle = 'white'
     ctx.lineWidth = 1
@@ -245,16 +207,10 @@ class App extends Component {
       ctx.stroke()
       ctx.closePath();
     })
+  }
 
-    if (Math.random() < 0.0025 && flyingStars.length < 2) {
-      const startX = Math.random() * window.innerWidth
-      const startY = Math.random() * window.innerHeight
-      const lifespan = Math.random() * 50 + 100
-      const xDir = this.generateDirection()
-      const yDir = this.generateDirection()
-      this.setState({ flyingStars: flyingStars.concat({start: { x: startX, y: startY }, current: { x: startX, y: startY }, lifespan, age: 0, xDir, yDir, isDead: false }) })
-      return
-    }
+  drawFlyingStars = () => {
+    const { ctx, flyingStars } = this.state
     flyingStars.forEach((flyingStar) => {
       if (flyingStar.isDead) {
         return
@@ -266,8 +222,8 @@ class App extends Component {
       if (amountOfGradient > 1) {
         amountOfGradient = 1
       }
-      grd.addColorStop(amountOfGradient, 'rgb(255,255,255,0)')
-      grd.addColorStop(1, 'white')
+      grd.addColorStop(amountOfGradient, '#FFFFFF00')
+      grd.addColorStop(1, '#FFFFFF')
       ctx.strokeStyle = grd
       ctx.lineWidth = 2
       ctx.moveTo(flyingStar.start.x,flyingStar.start.y);
@@ -296,6 +252,13 @@ class App extends Component {
     this.setState({ flyingStars: flyingStars.filter((flyingStar) => !flyingStar.isDead) })
   }
 
+  toHex = (value) => {
+    let hex = value.toString(16)
+    if (hex.length < 2) {
+      hex = '0' + hex
+    }
+    return hex
+  }
 
   refreshAsteroids = () => {
     const { asteroids, ctx } = this.state
@@ -336,8 +299,8 @@ class App extends Component {
       ctx.lineWidth = 2
       //ctx.stroke()
       const grd3 = ctx.createRadialGradient(asteroid.x - scaledRadius / 2,asteroid.y - 1.3*scaledRadius,scaledRadius / 2,asteroid.x - scaledRadius / 2, asteroid.y-1.3*scaledRadius, 1.7*scaledRadius)
-      grd3.addColorStop(0, 'rgb(0,0,0,0)')
-      grd3.addColorStop(1, 'white')
+      grd3.addColorStop(0, '#00000000')
+      grd3.addColorStop(1, '#FFFFFF')
       ctx.fillStyle=grd3;
       ctx.fill()
       ctx.closePath()
@@ -347,8 +310,8 @@ class App extends Component {
       ctx.lineWidth = 2
       //ctx.stroke()
       const grd4 = ctx.createRadialGradient(asteroid.x - scaledRadius * 1.6,asteroid.y - scaledRadius * 0.6,scaledRadius / 4,asteroid.x - scaledRadius * 1.6, asteroid.y-scaledRadius * 0.6, 2*scaledRadius)
-      grd4.addColorStop(0, 'rgb(0,0,0,0)')      
-      grd4.addColorStop(1, 'black')
+      grd4.addColorStop(0, '#00000000')      
+      grd4.addColorStop(1, '#000000')
 
       ctx.fillStyle=grd4
       ctx.fill()
@@ -410,18 +373,14 @@ class App extends Component {
         const smokeSpeedY = newRocket.speed.y - 20 * Math.sin(Math.radians(newRocket.rotation - 90))
 
         const smokeSpeed = { x: (smokeSpeedX / 10 + randX) / 2, y: (smokeSpeedY / 10 + randY) / 2 }
-        const colorValue = 160 + Math.random() * 60
-        // const randCol = (Math.random() - 0.5) * 60
-        // const getRandCol = () => Math.random() * 254
-        const smokeColor = `rgb(${colorValue}, ${colorValue}, ${colorValue})`
-        // const smokeColor = `rgb(${93 + randCol}, ${202 + randCol}, ${49 + randCol})`
-        // const smokeColor = `rgb(${getRandCol()}, ${getRandCol()}, ${150})`
+        const colorValue = Math.floor(160 + Math.random() * 60)
+        const smokeColor = `#${this.toHex(colorValue)}${this.toHex(colorValue)}${this.toHex(colorValue)}`
         newRocket.smoke = newRocket.smoke.concat({ x: smokeX, y: smokeY, radius, speed: smokeSpeed, timestamp: Date.now(), color: smokeColor })
       }
     }
 
     if (Math.random() < 0.005 && newRocket.thrust === 0) {
-      const thrustDir = this.generateDirection()
+      const thrustDir = utils.generateDirection()
       newRocket.thrust = thrustDir
       newRocket.speed.rotation = newRocket.speed.rotation + thrustDir * 3
       setTimeout(() => {
@@ -485,13 +444,6 @@ class App extends Component {
     })
 
     this.setState({ rocket: newRocket })
-  }
-
-  updateState = () => {
-    this.refreshCanvas()
-    this.refreshAsteroids()
-    this.refreshRocket()
-    this.clearOutOfBoundsAsteroids()
   }
 
   render() {
