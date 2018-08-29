@@ -1,4 +1,3 @@
-//const getRandomColor = () => `rgb(${Math.random() * 254}, ${Math.random() * 254}, ${Math.random() * 254})`
 
 const generateHexValue = () => {
   let result = (Math.floor(Math.random()*15)).toString(16)
@@ -21,10 +20,46 @@ export const generateRandomColors = () => {
   return colors
 }
 
+const integerToHex = (value) => {
+  let hex = value.toString(16)
+  if (hex.length < 2) {
+    hex = '0' + hex
+  }
+  return hex
+}
+
 export const generateDirection = () => Math.random() < 0.5 ? -1 : 1
+
+const generateRandomCoordinate = (width, height) => {
+  const randomX = Math.random() * width
+  const randomY = Math.random() * height
+  return { x: randomX, y: randomY }
+}
+
+const loadImage = (src) => {
+  return new Promise((resolve, reject) => {
+    const resultImage = new Image()
+    resultImage.src = src
+    resultImage.addEventListener('load', () => {
+      resolve(resultImage)
+    })
+  })
+}
+
+const loadImages = (sources) => {
+  const imagePromises = sources.map((src) => loadImage(src))
+  return new Promise((resolve) => {
+    Promise.all(imagePromises).then((values) => {
+      resolve(values)
+    })
+  })
+}
 
 export default {
   getRandomColor,
   generateRandomColors,
+  integerToHex,
   generateDirection,
+  generateRandomCoordinate,
+  loadImages,
 }

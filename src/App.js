@@ -1,8 +1,12 @@
 import React, { Component } from 'react'
 import Portfolio from './components/Portfolio'
 import utils from './utils'
-import { Howl, Howler } from 'howler';
-import shuffle from 'shuffle-array'
+import gameState from './gameState'
+
+// External libraries
+import { Howl } from 'howler';
+
+// Asset imports
 import * as spaceSounds from './assets/deep_space.mp3'
 import * as rocketShipImage from './assets/rocket-ship.png'
 import * as thrustImage from './assets/thrust.png'
@@ -12,32 +16,43 @@ class App extends Component {
     super(props)
 
     this.state = {
-      asteroids: [],
-      stars: [],
-      rocket: null,
-      flyingStars: [],
-      ctx: null,
-      radius: 10,
-      bgColors: ['845EC2', '2C73D2', '0081CF', '0089BA', '008E9B', '008F7A'],
-      currentBgColors: ['845EC2', '2C73D2', '0081CF', '0089BA', '008E9B', '008F7A'],
-      bgCounter: 0,
+      asteroidRadius: 10,
+      fps: 60,
+      rocketShipImage: null,
+      thrustImage: null
     }
-    this.fps = 60
   }
 
   componentDidMount = () => {
+    // Initialize the game and then start it
     this.initObjects()
+    this.initCanvas()
+    this.start()
+  }
+
+  initObjects = () => {
+    // Generate all game objects
+    gameState.setState({ asteroids: utils.generateAsteroids(25, this.state.asteroidRadius) })
+    gameState.setState({ stars: utils.generateStars(window.innerWidth, window.innerHeight) })
+    gameState.setState({ rocket: utils.generateRocket() })
+  }
+
+  initCanvas = () => {
+    // Initialize canvas size, store its context and add an event listener
+    // to make the canvas responsive
     const canvas = this.refs.canvas
-    const ctx = canvas.getContext('2d')
-    this.setState({ ctx: canvas.getContext('2d') })
+    gameState.setState({ ctx: canvas.getContext('2d') })
     canvas.width  = window.innerWidth
     canvas.height = window.innerHeight
     window.addEventListener('resize', (event) => {
       this.refs.canvas.width  = window.innerWidth
       this.refs.canvas.height = window.innerHeight
-      this.setState({ stars: utils.generateStars(window.innerWidth, window.innerHeight) })
+      gameState.setState({ stars: utils.generateStars(window.innerWidth, window.innerHeight) })
     });
+  }
 
+  start = () => {
+    // Start soundtrack
     this.sound = new Howl({
       src: [spaceSounds],
       autoplay: true,
@@ -46,105 +61,61 @@ class App extends Component {
     });     
     this.sound.play();
 
-    const rocketShip = new Image()
-    rocketShip.src = rocketShipImage
-    rocketShip.addEventListener('load', () => {
-      this.rocketShipImage = rocketShip
-      const thrust = new Image()
-      thrust.src = thrustImage
-      thrust.addEventListener('load', () => {
-        this.thrustImage = thrust
-        setInterval(() => this.updateState(), (1000 / this.fps))
-      }, false)
-    }, false);
-  }
+    // Load images
+    const images = [rocketShipImage, thrustImage]
+    utils.loadImages(images).then((result) => {
+      this.setState({
+        rocketShipImage: result[0],
+        thrustImage: result[1]
+      })
 
-  initObjects = () => {
-    this.setState({ asteroids: utils.generateAsteroids(20, this.state.radius) })
-    this.setState({ stars: utils.generateStars(window.innerWidth, window.innerHeight) })
-    this.setState({ rocket: utils.generateRocket() })
+      // Start game loop
+      setInterval(() => this.updateState(), (1000 / this.state.fps))
+    })
   }
 
   updateState = () => {
-    this.refreshBackground()
-    this.refreshAsteroids()
-    this.refreshRocket()
-    this.clearOutOfBoundsAsteroids()
+    // Update all game objects
+    this.draw()
+    this.updateAsteroids()
+    this.updateRocket()
+    this.updateFlyingStars()
   }
 
-  refreshBackground = () => {
+  draw = () => {
+    // Draw all game objects
     this.clearCanvas()
-    this.generateBackground()
+    this.drawBackground()
     this.drawStars()
-    this.generateFlyingStars()
     this.drawFlyingStars()
+    this.drawAsteroids()
+    this.drawRocket()
   }
 
-  start = () => {
-    
-  }
 
   componentWillUnmount = () => {
+    // Stop music
     this.sound.stop()
   }
 
-  isOutOfBounds = (target) => {
-    if (target.x < 0 || target.x > window.innerWidth) {
-      return true
-    }
-
-    if (target.y < 0 || target.y > window.innerHeight) {
-      return true
-    }
-
-    return false
-  }
-
-  clearOutOfBoundsAsteroids = () => {
-    const { asteroids } = this.state
-    const originalLength = asteroids.length
-    const maxWidth = window.innerWidth
-    const maxHeight = window.innerHeight
-    const updatedAsteroids = asteroids.filter((asteroid) => {
-      const radius = asteroid.radius
-      const scaledRadius = asteroid.radius * Math.pow(2, -asteroid.z / 100)
-  
-      if (scaledRadius <= 1.2 || scaledRadius > window.innerWidth * 2) {
-        return false
-      }
-
-      if (asteroid.x > maxWidth + 2 * scaledRadius || asteroid.y > maxHeight + 2 * scaledRadius) {
-        return false
-      }
-
-      if (asteroid.x < 0 - 2 * scaledRadius|| asteroid.y < 0 - 2 * scaledRadius) {
-        return false
-      }
-
-      return true
-    }).sort((a, b) => (a.radius * Math.pow(2, -a.z / 100)) - (b.radius * Math.pow(2, -b.z / 100)))
-    this.setState({ asteroids: updatedAsteroids })
-    for (let i = 0; i < originalLength - updatedAsteroids.length; i++) {
-      this.setState((prevState) => ({ asteroids: prevState.asteroids.concat(utils.createAsteroid()) }))
-    }
-  }
-
   clearCanvas = () => {
-    const { ctx } = this.state
+    const { ctx } = gameState.getState()
     ctx.beginPath()
     ctx.clearRect(0, 0, this.refs.canvas.width, this.refs.canvas.height)
     ctx.closePath();
   }
 
-  generateBackground = () => {
-    const { ctx, bgColors, bgCounter, currentBgColors } = this.state
+  // Generates the colorful background
+  // that changes color
+  drawBackground = () => {
+    const { ctx, bgColors, bgCounter, currentBgColors } = gameState.getState()
     ctx.beginPath()
     var grd=ctx.createLinearGradient(0, this.refs.canvas.height, this.refs.canvas.width, 0);
-    let temp = null
-    this.setState({ bgCounter: bgCounter + 1 })
+    gameState.setState({ bgCounter: bgCounter + 1 })
+    // Change background colors
     for (let round = 0; round < 3; round++) {
-      if (bgCounter != 3) { break } 
-      this.setState({ bgCounter: 0 })
+      if (bgCounter !== 3) { break } 
+      gameState.setState({ bgCounter: 0 })
       let completedAmount = 0
       for (let i = 0; i < bgColors.length; i++) {
         const nextIndex = i === bgColors.length - 1 ? 0 : i + 1
@@ -168,9 +139,9 @@ class App extends Component {
           completedAmount = completedAmount + 1
         }
         if (completedAmount === currentBgColors.length) {
-          this.setState({ bgColors: currentBgColors.slice() })
+          gameState.setState({ bgColors: currentBgColors.slice() })
         }
-        this.setState({ currentBgColors })
+        gameState.setState({ currentBgColors })
       }
     }
 
@@ -183,20 +154,9 @@ class App extends Component {
     ctx.closePath();
   }
 
-  generateFlyingStars = () => {
-    const { flyingStars } = this.state
-    if (Math.random() < 0.0025 && flyingStars.length < 3) {
-      const startX = Math.random() * window.innerWidth
-      const startY = Math.random() * window.innerHeight
-      const lifespan = Math.random() * 50 + 100
-      const xDir = utils.generateDirection() * Math.random() * 2
-      const yDir = utils.generateDirection() * Math.random() * 2
-      this.setState({ flyingStars: flyingStars.concat({start: { x: startX, y: startY }, current: { x: startX, y: startY }, lifespan, age: 0, xDir, yDir, isDead: false }) })
-    }
-  }
-
+  // Draw the stars
   drawStars = () => {
-    const { ctx, stars } = this.state
+    const { ctx, stars } = gameState.getState()
     ctx.strokeStyle = 'white'
     ctx.fillStyle = 'white'
     ctx.lineWidth = 1
@@ -209,13 +169,51 @@ class App extends Component {
     })
   }
 
-  drawFlyingStars = () => {
-    const { ctx, flyingStars } = this.state
+  // Randomly generates a new flying star
+  // There can be max 5 flying stars alive at once
+  generateFlyingStar = () => {
+    const { flyingStars } = gameState.getState()
+    if (Math.random() < 0.003 && flyingStars.length < 5) {
+      const randomCoordinate = utils.generateRandomCoordinate(window.innerWidth, window.innerHeight)
+      const startX = randomCoordinate.x
+      const startY = randomCoordinate.y
+      const lifespan = Math.random() * 50 + 100
+      const xDir = utils.generateDirection() * Math.random() * 2
+      const yDir = utils.generateDirection() * Math.random() * 2
+      gameState.setState({ flyingStars: flyingStars.concat({start: { x: startX, y: startY }, current: { x: startX, y: startY }, lifespan, age: 0, xDir, yDir, isDead: false }) })
+    }
+  }
+
+  // Update flying stars' position etc.
+  updateFlyingStars = () => {
+    this.generateFlyingStar()
+    const { flyingStars } = gameState.getState()
     flyingStars.forEach((flyingStar) => {
       if (flyingStar.isDead) {
         return
       }
+
       flyingStar.age = flyingStar.age + 1
+      let lifetime = flyingStar.age/flyingStar.lifespan
+      if (lifetime > 1) {
+        flyingStar.isDead = true
+      }
+
+      flyingStar.current = { x: flyingStar.current.x + 2 * flyingStar.xDir, y: flyingStar.current.y + 2 * flyingStar.yDir }
+      if (
+        utils.isOutOfBounds(flyingStar.start.x, flyingStar.start.y, 0, window.innerWidth, 0, window.innerHeight) &&
+        utils.isOutOfBounds(flyingStar.current.x, flyingStar.current.y, 0, window.innerWidth, 0, window.innerHeight)
+      ) {
+        flyingStar.isDead = true
+      }
+    })
+    gameState.setState({ flyingStars: flyingStars.filter((flyingStar) => !flyingStar.isDead) })
+  }
+
+  // Draw the flying stars
+  drawFlyingStars = () => {
+    const { ctx, flyingStars } = gameState.getState()
+    flyingStars.forEach((flyingStar) => {
       ctx.beginPath()
       const grd=ctx.createLinearGradient(flyingStar.start.x, flyingStar.start.y, flyingStar.current.x, flyingStar.current.y);
       let amountOfGradient = flyingStar.age/flyingStar.lifespan
@@ -230,48 +228,49 @@ class App extends Component {
       ctx.lineTo(flyingStar.current.x,flyingStar.current.y);
       ctx.stroke()
       ctx.closePath();
-
-      if (amountOfGradient === 1) {
-        flyingStar.isDead = true
-      }
-
-      let changeRatio = 1
-      if (flyingStar.age > flyingStar.lifespan / 2) {
-        changeRatio = changeRatio / 2
-      }
-      
-      flyingStar.current = { x: flyingStar.current.x + 2 * flyingStar.xDir, y: flyingStar.current.y + 2 * flyingStar.yDir }
-
-      if (
-        this.isOutOfBounds({ x: flyingStar.start.x, y: flyingStar.start.y }) &&
-        this.isOutOfBounds({ x: flyingStar.current.x, y: flyingStar.current.y })
-      ) {
-        flyingStar.isDead = true
-      }
     })
-    this.setState({ flyingStars: flyingStars.filter((flyingStar) => !flyingStar.isDead) })
   }
 
-  toHex = (value) => {
-    let hex = value.toString(16)
-    if (hex.length < 2) {
-      hex = '0' + hex
+  // Removes asteroids that are out of screen or too close to camera
+  // and sorts them by size from camera's perspective
+  clearOutOfBoundsAsteroids = () => {
+    const { asteroids } = gameState.getState()
+    const originalLength = asteroids.length
+    const updatedAsteroids = asteroids.filter((asteroid) => {
+      // Scaled radius = asteroid's size from camera's perspective
+      const scaledRadius = asteroid.radius * Math.pow(2, -asteroid.z / 100)
+      const maxWidth = window.innerWidth + 2 * scaledRadius
+      const maxHeight = window.innerHeight + 2 * scaledRadius
+      const minWidth = 0 - 2 * scaledRadius
+      const minHeight =  0 - 2 * scaledRadius
+
+      // Check if asteroid is out of screen
+      if (utils.isOutOfBounds(asteroid.x, asteroid.y, minWidth, maxWidth, minHeight, maxHeight)) {
+        return false
+      }
+  
+      // Check if asteroid is too close to camera
+      if (scaledRadius <= 1.2 || scaledRadius > window.innerWidth * 2) {
+        return false
+      }
+
+      return true
+    }).sort((a, b) => (a.radius * Math.pow(2, -a.z / 100)) - (b.radius * Math.pow(2, -b.z / 100)))
+    gameState.setState({ asteroids: updatedAsteroids })
+    // Replace removed asteroids with new ones
+    for (let i = 0; i < originalLength - updatedAsteroids.length; i++) {
+      gameState.setState({ asteroids: gameState.getState().asteroids.concat(utils.createAsteroid()) })
     }
-    return hex
   }
 
-  refreshAsteroids = () => {
-    const { asteroids, ctx } = this.state
-    ctx.strokeStyle = 'black'
+  // Updates asteroids' state like position etc.
+  updateAsteroids = () => {
+    this.clearOutOfBoundsAsteroids()
+    const { asteroids } = gameState.getState()
     const updatedAsteroids = []
-    /* const centerX = window.innerWidth / 2
-    const centerY = window.innerHeight / 2
-    const centerZ = 0 */
     asteroids.forEach((asteroid) => {
-      ctx.beginPath()
       const radius = asteroid.radius
       const scaledRadius = radius * Math.pow(2, -asteroid.z / 100)
-      // const dist = Math.sqrt(Math.pow(centerX - asteroid.x, 2) + Math.pow(centerY - asteroid.y, 2) + Math.pow(centerZ - asteroid.z, 2))
       const newAsteroid = {
         ...asteroid,
         x: asteroid.x + asteroid.speed.x * (scaledRadius / 100),
@@ -279,36 +278,41 @@ class App extends Component {
         z: asteroid.z + asteroid.speed.z * (scaledRadius / 10),
         radius,
       }
+      updatedAsteroids.push(newAsteroid)
+    })
+    gameState.setState({ asteroids: updatedAsteroids })
+  }
+
+  // Draws asteroids to screen
+  drawAsteroids = () => {
+    const { asteroids, ctx } = gameState.getState()
+    ctx.strokeStyle = 'black'
+    asteroids.forEach((asteroid) => {
+      ctx.beginPath()
+      const radius = asteroid.radius
+      const scaledRadius = radius * Math.pow(2, -asteroid.z / 100)
       ctx.arc(asteroid.x - scaledRadius, asteroid.y - scaledRadius, scaledRadius, 0, 2 * Math.PI)
       ctx.lineWidth = 2
-      // ctx.stroke()
       const colorYOffset = asteroid.colorYOffset
       const grd2 = ctx.createRadialGradient(asteroid.x - scaledRadius / 2,asteroid.y - colorYOffset*1.3*scaledRadius,colorYOffset*(scaledRadius / 2),asteroid.x - scaledRadius / 2, asteroid.y-colorYOffset*1.3*scaledRadius, colorYOffset*(1.7*scaledRadius))
-      let shadowPercentage = Math.abs(asteroid.x / window.innerWidth)
-      shadowPercentage = shadowPercentage > 1 ? 1 : shadowPercentage
       asteroid.colors.forEach((color, i) => {
         grd2.addColorStop(i/asteroid.colors.length, color)
       })
       ctx.fillStyle=grd2;
       ctx.fill()
       ctx.closePath()
-      
-      //ctx.globalAlpha = 0.5;
       ctx.beginPath()
       ctx.arc(asteroid.x - scaledRadius, asteroid.y - scaledRadius, scaledRadius, 0, 2 * Math.PI)
       ctx.lineWidth = 2
-      //ctx.stroke()
       const grd3 = ctx.createRadialGradient(asteroid.x - scaledRadius / 2,asteroid.y - 1.3*scaledRadius,scaledRadius / 2,asteroid.x - scaledRadius / 2, asteroid.y-1.3*scaledRadius, 1.7*scaledRadius)
       grd3.addColorStop(0, '#00000000')
       grd3.addColorStop(1, '#FFFFFF')
       ctx.fillStyle=grd3;
       ctx.fill()
       ctx.closePath()
-
       ctx.beginPath()
       ctx.arc(asteroid.x - scaledRadius, asteroid.y - scaledRadius, scaledRadius, 0, 2 * Math.PI)
       ctx.lineWidth = 2
-      //ctx.stroke()
       const grd4 = ctx.createRadialGradient(asteroid.x - scaledRadius * 1.6,asteroid.y - scaledRadius * 0.6,scaledRadius / 4,asteroid.x - scaledRadius * 1.6, asteroid.y-scaledRadius * 0.6, 2*scaledRadius)
       grd4.addColorStop(0, '#00000000')      
       grd4.addColorStop(1, '#000000')
@@ -316,14 +320,12 @@ class App extends Component {
       ctx.fillStyle=grd4
       ctx.fill()
       ctx.closePath()
-      //ctx.globalAlpha = 1;
-      updatedAsteroids.push(newAsteroid)
     })
-    this.setState({ asteroids: updatedAsteroids })
   }
 
-  refreshRocket = () => {
-    const { ctx, rocket } = this.state
+  // Updates rocket state like position etc.
+  updateRocket = () => {
+    const { rocket } = gameState.getState()
     const newRocket = {
       ...rocket,
       x: rocket.x + rocket.speed.x * 0.1,
@@ -345,7 +347,6 @@ class App extends Component {
       newRocket.y = 0 - offset
     }
 
-
     if (Math.random() < 0.008 || newRocket.smoking) {
       // -90 is needed because the rocket points upwards at start
       const changeX = Math.cos(Math.radians(newRocket.rotation - 90))
@@ -357,7 +358,8 @@ class App extends Component {
       }
       if (!newRocket.smoking) {
       setTimeout(() => {
-        this.setState((prevState) => ({ rocket: { ...prevState.rocket, smoking: false } }))
+        
+        gameState.setState({ rocket: { ...gameState.getState().rocket, smoking: false } })
         }, Math.random() * 1000)
       }
 
@@ -374,7 +376,7 @@ class App extends Component {
 
         const smokeSpeed = { x: (smokeSpeedX / 10 + randX) / 2, y: (smokeSpeedY / 10 + randY) / 2 }
         const colorValue = Math.floor(160 + Math.random() * 60)
-        const smokeColor = `#${this.toHex(colorValue)}${this.toHex(colorValue)}${this.toHex(colorValue)}`
+        const smokeColor = `#${utils.integerToHex(colorValue).repeat(3)}`
         newRocket.smoke = newRocket.smoke.concat({ x: smokeX, y: smokeY, radius, speed: smokeSpeed, timestamp: Date.now(), color: smokeColor })
       }
     }
@@ -384,46 +386,21 @@ class App extends Component {
       newRocket.thrust = thrustDir
       newRocket.speed.rotation = newRocket.speed.rotation + thrustDir * 3
       setTimeout(() => {
-        this.setState((prevState) => ({
+        gameState.setState({
           rocket: {
-            ...prevState.rocket,
-            thrust:0
+            ...gameState.getState().rocket,
+            thrust: 0
           }
-        }))
+        })
       }, 1000)
     }
 
-    ctx.save();
-    ctx.translate(newRocket.x,newRocket.y);
-    ctx.rotate(newRocket.rotation*Math.PI/180);
-    ctx.translate(-newRocket.x, -newRocket.y)
-    ctx.beginPath()
-    ctx.drawImage(this.rocketShipImage, newRocket.x - 45, newRocket.y - 26, 90, 52)
-    if (newRocket.thrust !== 0) {
-      ctx.translate(newRocket.x,newRocket.y);
-      ctx.rotate(newRocket.thrust*90*Math.PI/180);
-      ctx.translate(-newRocket.x, -newRocket.y)
-      if (newRocket.thrust < 0) {
-        ctx.drawImage(this.thrustImage, newRocket.x - 2, newRocket.y + 7, 20, 20)
-      } else {
-        ctx.drawImage(this.thrustImage, newRocket.x - 18, newRocket.y + 7, 20, 20)
-      }
-    }
-    ctx.closePath()
-    ctx.restore();
-
-    ctx.strokeStyle = 'black'
     newRocket.smoke.forEach((particle, i) => {
-      ctx.fillStyle = particle.color
-      ctx.beginPath()
       const lifetime = Date.now() - particle.timestamp
       let sizeRatio = (1-(lifetime/3000*particle.radius/6))
       if (sizeRatio < 0) {
         sizeRatio = 0
       }
-      ctx.arc(particle.x, particle.y, particle.radius * sizeRatio, 0, 2 * Math.PI)
-      ctx.fill()
-      ctx.closePath()
       particle = { ...particle, x: particle.x + particle.speed.x, y: particle.y + particle.speed.y }
       newRocket.smoke[i] = particle
     })
@@ -443,7 +420,49 @@ class App extends Component {
       return true
     })
 
-    this.setState({ rocket: newRocket })
+    gameState.setState({ rocket: newRocket })
+  }
+
+  // Draws rocket to screen
+  drawRocket = () => {
+    const { ctx, rocket } = gameState.getState()
+    ctx.save();
+    ctx.translate(rocket.x,rocket.y);
+    ctx.rotate(rocket.rotation*Math.PI/180);
+    ctx.translate(-rocket.x, -rocket.y)
+    ctx.beginPath()
+    ctx.drawImage(this.state.rocketShipImage, rocket.x - 45, rocket.y - 26, 90, 52)
+    if (rocket.thrust !== 0) {
+      ctx.translate(rocket.x,rocket.y);
+      ctx.rotate(rocket.thrust*90*Math.PI/180);
+      ctx.translate(-rocket.x, -rocket.y)
+      if (rocket.thrust < 0) {
+        ctx.drawImage(this.state.thrustImage, rocket.x - 2, rocket.y + 7, 20, 20)
+      } else {
+        ctx.drawImage(this.state.thrustImage, rocket.x - 18, rocket.y + 7, 20, 20)
+      }
+    }
+    ctx.closePath()
+    ctx.restore();
+    this.drawRocketSmoke()
+  }
+
+  // Draws rocket's smoke
+  drawRocketSmoke = () => {
+    const { ctx, rocket } = gameState.getState()
+    ctx.strokeStyle = 'black'
+    rocket.smoke.forEach((particle, i) => {
+      ctx.fillStyle = particle.color
+      ctx.beginPath()
+      const lifetime = Date.now() - particle.timestamp
+      let sizeRatio = (1-(lifetime/3000*particle.radius/6))
+      if (sizeRatio < 0) {
+        sizeRatio = 0
+      }
+      ctx.arc(particle.x, particle.y, particle.radius * sizeRatio, 0, 2 * Math.PI)
+      ctx.fill()
+      ctx.closePath()
+    })
   }
 
   render() {

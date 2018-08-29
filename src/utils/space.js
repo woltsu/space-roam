@@ -58,12 +58,24 @@ const generateRocket = () => {
     smoking: false
   }
   return rocket
-  //this.setState({ rocket })
+}
+
+const isOutOfBounds = (x, y, minWidth, maxWidth, minHeight, maxHeight) => {
+  if (x < minWidth || x > maxWidth) {
+    return true
+  }
+
+  if (y < minHeight || y > maxHeight) {
+    return true
+  }
+
+  return false
 }
 
 export default {
   createAsteroid,
   generateAsteroids,
   generateStars,
-  generateRocket
+  generateRocket,
+  isOutOfBounds
 }
