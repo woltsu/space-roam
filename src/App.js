@@ -41,7 +41,7 @@ class App extends Component {
     // Initialize canvas size, store its context and add an event listener
     // to make the canvas responsive
     const canvas = this.refs.canvas
-    gameState.setState({ ctx: canvas.getContext('2d') })
+    gameState.setState({ ctx: canvas.getContext('2d', { alpha: false }) })
     canvas.width  = window.innerWidth
     canvas.height = window.innerHeight
     window.addEventListener('resize', (event) => {
@@ -70,7 +70,7 @@ class App extends Component {
       })
 
       // Start game loop
-      setInterval(() => this.updateState(), (1000 / this.state.fps))
+      requestAnimationFrame(this.updateState)
     })
   }
 
@@ -90,6 +90,7 @@ class App extends Component {
     this.drawFlyingStars()
     this.drawAsteroids()
     this.drawRocket()
+    requestAnimationFrame(this.updateState)
   }
 
 
@@ -173,7 +174,7 @@ class App extends Component {
   // There can be max 5 flying stars alive at once
   generateFlyingStar = () => {
     const { flyingStars } = gameState.getState()
-    if (Math.random() < 0.003 && flyingStars.length < 5) {
+    if (Math.random() < 0.004 && flyingStars.length < 5) {
       const randomCoordinate = utils.generateRandomCoordinate(window.innerWidth, window.innerHeight)
       const startX = randomCoordinate.x
       const startY = randomCoordinate.y
@@ -349,13 +350,11 @@ class App extends Component {
 
     if (Math.random() < 0.008 || newRocket.smoking) {
       // -90 is needed because the rocket points upwards at start
-      const changeX = Math.cos(Math.radians(newRocket.rotation - 90))
-      const changeY = Math.sin(Math.radians(newRocket.rotation - 90))
+      const changeX = Math.cos(Math.radians(newRocket.rotation - 90)) * 0.05
+      const changeY = Math.sin(Math.radians(newRocket.rotation - 90)) * 0.05
 
-      if (!newRocket.smoking) {
-        newRocket.speed.x = newRocket.speed.x + changeX
-        newRocket.speed.y = newRocket.speed.y + changeY
-      }
+      newRocket.speed.x = newRocket.speed.x + changeX
+      newRocket.speed.y = newRocket.speed.y + changeY
       if (!newRocket.smoking) {
       setTimeout(() => {
         
@@ -364,7 +363,7 @@ class App extends Component {
       }
 
       newRocket.smoking = true
-      for (let i = 0; i < Math.random() * 5; i++) {
+      for (let i = 0; i < Math.random() * 6; i++) {
         const smokeX = newRocket.x - 20 * Math.cos(Math.radians(newRocket.rotation - 90))
         const smokeY = newRocket.y - 20 * Math.sin(Math.radians(newRocket.rotation - 90))
         const radius = Math.random() * 5
