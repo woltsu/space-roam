@@ -17,6 +17,7 @@ class App extends Component {
       asteroids: [],
       stars: [],
       rocket: null,
+      flyingStars: [],
       ctx: null,
       radius: 10,
       bgColors: ['845EC2', '2C73D2', '0081CF', '0089BA', '008E9B', '008F7A'],
@@ -97,6 +98,18 @@ class App extends Component {
     }
   }
 
+  isOutOfBounds = (target) => {
+    if (target.x < 0 || target.x > window.innerWidth) {
+      return true
+    }
+
+    if (target.y < 0 || target.y > window.innerHeight) {
+      return true
+    }
+
+    return false
+  }
+
   generateDirection = () => Math.random() < 0.5 ? -1 : 1
 
   getRandCol = () => `rgb(${Math.random() * 254}, ${Math.random() * 254}, ${Math.random() * 254})`
@@ -156,7 +169,7 @@ class App extends Component {
   }
 
   initAsteroids = () => {
-    const howManyAsteroids = 23
+    const howManyAsteroids = 20
     for (let i = 0; i < howManyAsteroids; i++) {
       this.createAsteroid(true)
     }
@@ -173,7 +186,7 @@ class App extends Component {
   }
 
   refreshCanvas = () => {
-    const { ctx, stars, bgColors, bgCounter, currentBgColors } = this.state
+    const { ctx, stars, bgColors, bgCounter, currentBgColors, flyingStars } = this.state
     ctx.beginPath()
     ctx.clearRect(0, 0, this.refs.canvas.width, this.refs.canvas.height)
     ctx.closePath();
@@ -231,7 +244,57 @@ class App extends Component {
       ctx.stroke()
       ctx.closePath();
     })
+
+    if (Math.random() < 0.0025 && flyingStars.length < 2) {
+      const startX = Math.random() * window.innerWidth
+      const startY = Math.random() * window.innerHeight
+      const lifespan = Math.random() * 50 + 100
+      const xDir = this.generateDirection()
+      const yDir = this.generateDirection()
+      this.setState({ flyingStars: flyingStars.concat({start: { x: startX, y: startY }, current: { x: startX, y: startY }, lifespan, age: 0, xDir, yDir, isDead: false }) })
+      return
+    }
+    flyingStars.forEach((flyingStar) => {
+      if (flyingStar.isDead) {
+        return
+      }
+      flyingStar.age = flyingStar.age + 1
+      ctx.beginPath()
+      const grd=ctx.createLinearGradient(flyingStar.start.x, flyingStar.start.y, flyingStar.current.x, flyingStar.current.y);
+      let amountOfGradient = flyingStar.age/flyingStar.lifespan
+      if (amountOfGradient > 1) {
+        amountOfGradient = 1
+      }
+      grd.addColorStop(amountOfGradient, 'rgb(255,255,255,0)')
+      grd.addColorStop(1, 'white')
+      ctx.strokeStyle = grd
+      ctx.lineWidth = 2
+      ctx.moveTo(flyingStar.start.x,flyingStar.start.y);
+      ctx.lineTo(flyingStar.current.x,flyingStar.current.y);
+      ctx.stroke()
+      ctx.closePath();
+
+      if (amountOfGradient === 1) {
+        flyingStar.isDead = true
+      }
+
+      let changeRatio = 1
+      if (flyingStar.age > flyingStar.lifespan / 2) {
+        changeRatio = changeRatio / 2
+      }
+      
+      flyingStar.current = { x: flyingStar.current.x + 2 * flyingStar.xDir, y: flyingStar.current.y + 2 * flyingStar.yDir }
+
+      if (
+        this.isOutOfBounds({ x: flyingStar.start.x, y: flyingStar.start.y }) &&
+        this.isOutOfBounds({ x: flyingStar.current.x, y: flyingStar.current.y })
+      ) {
+        flyingStar.isDead = true
+      }
+    })
+    this.setState({ flyingStars: flyingStars.filter((flyingStar) => !flyingStar.isDead) })
   }
+
 
   refreshAsteroids = () => {
     const { asteroids, ctx } = this.state
@@ -256,7 +319,7 @@ class App extends Component {
       ctx.lineWidth = 2
       ctx.stroke()
       const colorYOffset = asteroid.colorYOffset
-      const grd2 = ctx.createRadialGradient(asteroid.x - scaledRadius / 2,asteroid.y - colorYOffset*1.3*scaledRadius,scaledRadius / 2,asteroid.x - scaledRadius / 2, asteroid.y-colorYOffset*1.3*scaledRadius, 1.7*scaledRadius)
+      const grd2 = ctx.createRadialGradient(asteroid.x - scaledRadius / 2,asteroid.y - colorYOffset*1.3*scaledRadius,colorYOffset*(scaledRadius / 2),asteroid.x - scaledRadius / 2, asteroid.y-colorYOffset*1.3*scaledRadius, colorYOffset*(1.7*scaledRadius))
       let shadowPercentage = Math.abs(asteroid.x / window.innerWidth)
       shadowPercentage = shadowPercentage > 1 ? 1 : shadowPercentage
       asteroid.colors.forEach((color, i) => {
@@ -272,8 +335,7 @@ class App extends Component {
       ctx.lineWidth = 2
       ctx.stroke()
       const grd3 = ctx.createRadialGradient(asteroid.x - scaledRadius / 2,asteroid.y - 1.3*scaledRadius,scaledRadius / 2,asteroid.x - scaledRadius / 2, asteroid.y-1.3*scaledRadius, 1.7*scaledRadius)
-      //grd3.addColorStop(0.9, 'rgb(0,0,0,0)')
-      grd3.addColorStop(0.1, 'rgb(0,0,0,0)')
+      grd3.addColorStop(0, 'rgb(0,0,0,0)')
       grd3.addColorStop(1, 'white')
       ctx.fillStyle=grd3;
       ctx.fill()
@@ -388,8 +450,6 @@ class App extends Component {
         sizeRatio = 0
       }
       ctx.arc(particle.x, particle.y, particle.radius * sizeRatio, 0, 2 * Math.PI)
-      ctx.lineWidth = 3
-      //ctx.stroke()
       ctx.fill()
       ctx.closePath()
       particle = { ...particle, x: particle.x + particle.speed.x, y: particle.y + particle.speed.y }
