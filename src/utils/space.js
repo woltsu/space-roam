@@ -14,13 +14,15 @@ const createAsteroid = (radius) => {
     z: zDir < 0 ? 260 : -600,
     speed: { x: speedX, y: speedY, z: speedZ },
     radius: r,
-    colors: generateRandomColors(),
-    colorYOffset: Math.random() * 4
+    colors: generateRandomColors(20),
+    colorYOffset: Math.random() * 2 * generateDirection(),
+    colorXOffset: Math.random() * 2 * generateDirection(),
+    radiusOffset: Math.random() * 2
   }
   return newAsteroid
 }
 
-const generateAsteroids = (howMany, radius) => {
+const generateAsteroids = (howMany) => {
   const result = []
   for (let i = 0; i < howMany; i++) {
     result.push(createAsteroid())

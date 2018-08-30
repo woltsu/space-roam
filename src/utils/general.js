@@ -12,9 +12,9 @@ const getRandomColor = () => {
   return result
 }
 
-export const generateRandomColors = () => {
+export const generateRandomColors = (max = 10) => {
   const colors = []
-  for (let i = 0; i < Math.random() * 10; i++) {
+  for (let i = 0; i < Math.random() * max; i++) {
     colors.push(getRandomColor())
   }
   return colors
@@ -46,6 +46,8 @@ const loadImage = (src) => {
   })
 }
 
+const stringReplace = (target, indexStart, newValue) => target.substring(0, indexStart) + newValue + target.substring(indexStart + newValue.length)
+
 const loadImages = (sources) => {
   const imagePromises = sources.map((src) => loadImage(src))
   return new Promise((resolve) => {
@@ -61,5 +63,6 @@ export default {
   integerToHex,
   generateDirection,
   generateRandomCoordinate,
+  stringReplace,
   loadImages,
 }
